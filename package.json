@@ -1,0 +1,19 @@
+{
+  "name": "TSChatRoom",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --max-old-space-size=8192 index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "typescript": "^5.5.3"
+  },
+  "private": true,
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "redis": "^5.0.1"
+  }
+}
