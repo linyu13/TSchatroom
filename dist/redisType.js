@@ -47,7 +47,7 @@ exports.RedisCreat = RedisCreat;
 exports.RedisHashset = RedisHashset;
 exports.ReddishGet = ReddishGet;
 exports.RedisExist = RedisExist;
-exports.RedisSet = RedisSet;
+exports.RedisSetAdd = RedisSetAdd;
 exports.RedisSrem = RedisSrem;
 exports.RedisGetMember = RedisGetMember;
 exports.RedisIsMember = RedisIsMember;
@@ -56,6 +56,10 @@ exports.RedisMessageReadAll = RedisMessageReadAll;
 exports.RedisMessageReadUnread = RedisMessageReadUnread;
 exports.RedisMessageHasUnread = RedisMessageHasUnread;
 exports.RedisMessageDel = RedisMessageDel;
+exports.RedisStringGet = RedisStringGet;
+exports.RedisMessageBlPop = RedisMessageBlPop;
+exports.RedisSubscribe = RedisSubscribe;
+exports.RedisPublish = RedisPublish;
 const redis_1 = require("redis");
 const console = __importStar(require("node:console"));
 const process = __importStar(require("node:process"));
@@ -90,7 +94,7 @@ function RedisExist(key) {
     });
 }
 // 用户添加
-function RedisSet(UserID, FriendID) {
+function RedisSetAdd(UserID, FriendID) {
     return __awaiter(this, void 0, void 0, function* () {
         yield exports.redisClient.sAdd(UserID, FriendID);
     });
@@ -146,5 +150,32 @@ function RedisMessageHasUnread(UserID, FriendID) {
 function RedisMessageDel(Key) {
     return __awaiter(this, void 0, void 0, function* () {
         yield exports.redisClient.del(Key);
+    });
+}
+function RedisStringGet(Key) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield exports.redisClient.get(Key);
+    });
+}
+function RedisMessageBlPop(key) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield exports.redisClient.blPop(key, 0);
+    });
+}
+// 订阅频道
+function RedisSubscribe(channel, messageHandler) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subscriber = exports.redisClient.duplicate();
+        yield subscriber.connect();
+        yield subscriber.subscribe(channel, (message) => {
+            messageHandler(message);
+        });
+        return subscriber; // 如果后续要取消订阅可以用它
+    });
+}
+// 发布消息
+function RedisPublish(channel, message) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield exports.redisClient.publish(channel, message);
     });
 }

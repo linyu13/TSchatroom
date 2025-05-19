@@ -29,7 +29,7 @@ export async function RedisExist(key: string): Promise<number> {
 }
 
 // 用户添加
-export async function RedisSet(UserID: string, FriendID: string) {
+export async function RedisSetAdd(UserID: string, FriendID: string) {
     await redisClient.sAdd(UserID, FriendID);
 }
 
@@ -81,9 +81,9 @@ export async function RedisStringGet(Key: string) {
     return await redisClient.get(Key);
 }
 
-export async function RedisMessageBlPop(key: string) {
-    return await redisClient.blPop(key, 0);
-}
+// export async function RedisMessageBlPop(key: string) {
+//     return await redisClient.blPop(key, 0);
+// }
 
 // 订阅频道
 export async function RedisSubscribe(channel: string, messageHandler: (msg: string) => void) {

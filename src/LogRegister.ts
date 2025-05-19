@@ -1,4 +1,4 @@
-// import * as net from 'net';
+import * as net from 'net';
 import {Socket} from 'net';
 import * as SerWorkMune from './SerWorkMune'
 import * as RedisHandle from './redisType'
@@ -40,18 +40,20 @@ export async function Menu(socket: Socket) {
         }
     }
     const UserID = username as string;
-    const Clients: Map<Socket, SerWorkMune.ClientState> = new Map();
-    await RedisHandle.RedisSet('online', UserID);
+    const Clients: Map<string, net.Socket> = new Map();
+    await RedisHandle.RedisSetAdd('online', UserID);
     while (true) {
         const state: SerWorkMune.ClientState = {
             userId: UserID,
             mode: false,
             chatTarget: '',
+            SocketId: UserID,
         };
-        Clients.set(socket, state);
+        Clients.set(UserID, socket);
+        await RedisHandle.redisClient.set(`Client${UserID}`, JSON.stringify(state));
         await SerWorkMune.LoginMune(socket);
         action = await getInput(socket, '请输入数字以选择功能');
-        if (action === '6') {
+        if (action === '5') {
             socket.write('已退出');
             await RedisHandle.RedisSrem('online', UserID);
             socket.end();
@@ -82,8 +84,8 @@ export async function Menu(socket: Socket) {
                         socket.write('不能添加自己为好友');
                         // break;
                     }
-                    await RedisHandle.RedisSet(UserID, targetUser);
-                    await RedisHandle.RedisSet(targetUser, UserID);
+                    await RedisHandle.RedisSetAdd(UserID, targetUser);
+                    await RedisHandle.RedisSetAdd(targetUser, UserID);
                     socket.write(`添加好友${targetUser}成功`);
                 } else if (FriendHandle === '3') {
                     // 删除好友
@@ -119,7 +121,7 @@ export async function Menu(socket: Socket) {
                     if (!await RedisHandle.RedisIsMember('GroupList', TargetGroupID)) {
                         socket.write(`群聊${TargetGroupID}不存在`);
                     } else {
-                        await RedisHandle.RedisSet(`Group${TargetGroupID}`, UserID);
+                        await RedisHandle.RedisSetAdd(`Group${TargetGroupID}`, UserID);
                         socket.write(`用户${UserID}添加${TargetGroupID}成功`);
                     }
                 } else if (GroupHandle === '2') {
@@ -128,9 +130,9 @@ export async function Menu(socket: Socket) {
                     if (await RedisHandle.RedisExist(TargetGroupID)) {
                         socket.write(`群聊${TargetGroupID}已存在`);
                     } else {
-                        await RedisHandle.RedisSet('GroupList', TargetGroupID);
+                        await RedisHandle.RedisSetAdd('GroupList', TargetGroupID);
                         socket.write(`用户${UserID}创建${TargetGroupID}成功`);
-                        await RedisHandle.RedisSet(`Group${TargetGroupID}`, UserID);
+                        await RedisHandle.RedisSetAdd(`Group${TargetGroupID}`, UserID);
                     }
                 } else if (GroupHandle === '3') {
                     // 退出群聊
@@ -147,13 +149,13 @@ export async function Menu(socket: Socket) {
                 } else if (GroupHandle === '4') {
                     // 查看群组成员
                     let TargetGroupID = await getInput(socket, '输入你想查看成员的群聊名');
-                    if (!await RedisHandle.RedisExist(TargetGroupID)) {
+                    if (!await RedisHandle.RedisIsMember(`GroupList`, TargetGroupID)) {
                         socket.write(`群聊${TargetGroupID}不存在`);
                     }
-                    if (!await RedisHandle.RedisIsMember(TargetGroupID, UserID)) {
+                    if (!await RedisHandle.RedisIsMember(`Group${TargetGroupID}`, UserID)) {
                         socket.write(`${UserID}不是${TargetGroupID}的成员`);
                     } else {
-                        let FriendList = await RedisHandle.RedisGetMember(TargetGroupID);
+                        let FriendList = await RedisHandle.RedisGetMember(`Group${TargetGroupID}`);
                         socket.write(`群聊${TargetGroupID}成员列表如下:
                     ${FriendList}`);
 
@@ -191,8 +193,17 @@ export async function Menu(socket: Socket) {
                 state.mode = true;
                 state.chatTarget = TargetID;
                 socket.write(`已进入与${TargetID}的私聊界面\n输入/exit以退出`);
+                await RedisHandle.redisClient.set(`Client${UserID}`, JSON.stringify(state));
                 // 先加载消息再发送消息
+                // let Listening = true;
                 if (state.mode) {
+
+                    const subscriber = await RedisHandle.RedisSubscribe(`${TargetID}:${UserID}:channel`, (msg) => {
+                        // 收到消息就写给客户端socket
+                        const message = JSON.parse(msg);
+                        socket.write(chalk.blue(`${message.sender}\n`) + `${message.content}\n`);
+                    });
+
                     let IsUnread = await RedisHandle.RedisMessageHasUnread(TargetID, UserID);
                     if (IsUnread !== 0) {
                         // 判断是否有未读消息，如果有，只显示未读消息
@@ -230,6 +241,9 @@ export async function Menu(socket: Socket) {
                             socket.write(`退出与 ${TargetID} 的私聊。\n`);
                             state.mode = false;
                             state.chatTarget = undefined;
+                            // Listening = false;
+                            await subscriber.unsubscribe(`${TargetID}:${UserID}:channel`);
+                            await subscriber.quit();
                             break;
                         }
 
@@ -240,35 +254,116 @@ export async function Menu(socket: Socket) {
                         };
 
                         if (await RedisHandle.RedisIsMember('online', TargetID)) {
-                            let isPushed = false;
-                            const target = SerWorkMune.getTargetSocket(Clients, UserID, TargetID);
-                            if (target) {
-                                target.write(chalk.green(`\n[${msgObj.sender}]\n${msgObj.content}\n`));
-                                await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
-                                isPushed = true;
-                            }
-                            if (!isPushed) {
-                                // 对方在线但不在聊天界面
-                                await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriUnread`, JSON.stringify(msgObj));
-                                await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
-                            }
+                            const isOnline = await RedisHandle.RedisIsMember('online', TargetID);
+                            const msgStr = JSON.stringify(msgObj);
 
-                        } else {
-                            // 对方离线
-                            await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriUnread`, JSON.stringify(msgObj));
-                            await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
+// 始终存入历史记录
+                            await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, msgStr);
+
+                            if (isOnline) {
+                                const TargetRaw = await RedisHandle.RedisStringGet(`Client${TargetID}`);
+                                if (TargetRaw) {
+                                    const TargetState: SerWorkMune.ClientState = JSON.parse(TargetRaw);
+                                    const isInChat = TargetState.mode && TargetState.chatTarget === UserID;
+
+                                    if (isInChat) {
+                                        // 实时推送
+                                        console.log('>>> 在线并在聊天界面，推送消息');
+                                        await RedisHandle.RedisPublish(`${UserID}:${TargetID}:channel`, msgStr);
+                                    } else {
+                                        // 在线但不在聊天界面 → 存未读
+                                        console.log('>>> 在线但不在聊天界面，存入未读');
+                                        await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriUnread`, msgStr);
+                                    }
+                                }
+                            } else {
+                                // 离线，存未读
+                                console.log('>>> 用户离线，存入未读');
+                                await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriUnread`, msgStr);
+                            }
+                            // 这里需要实现两个List来支持消息读取
+                            // 接收消息部分的话，则在进入聊天界面时读取全部的inbox以及后二十条
                         }
+
+                    }
+                }
+            }
+        } else if (action === '4') {
+            let GroupID = await getInput(socket, '输入你想要聊天的群组');
+            if (!await RedisHandle.RedisIsMember(`Group${GroupID}`, UserID)) {
+                socket.write(`用户${UserID}不在${GroupID}当中\n`);
+            } else {
+                state.mode = true;
+                state.chatTarget = GroupID;
+                socket.write(`已进入与${GroupID}的群聊界面\n输入/exit以退出`);
+                await RedisHandle.redisClient.set(`Client${UserID}`, JSON.stringify(state));
+                if (state.mode) {
+                    const subscriber = await RedisHandle.RedisSubscribe(`${GroupID}:channel`, (msg) => {
+                        // 收到消息就写给客户端socket
+                        const message = JSON.parse(msg);
+                        if (message.sender !== UserID) {
+                            socket.write(chalk.blue(`${message.sender}\n`) + `${message.content}\n`);
+                        }
+                    });
+
+
+                    // 加载二十条历史记录
+                    let LastReadMessageAll = await RedisHandle.RedisMessageReadAll(`${GroupID}:GroAll`);
+                    const AllMessage = [...LastReadMessageAll].map(x => JSON.parse(x));
+                    AllMessage.forEach(function (msg) {
+                        socket.write(chalk.blue(`${msg.sender}\n`) + `${msg.content}\n`);
+                    });
+
+                    while (state.mode) {
+
+                        const Message = await getInput(socket, '>');
+                        if (Message === '/exit') {
+                            socket.write(`退出与 ${GroupID} 的私聊。\n`);
+                            state.mode = false;
+                            state.chatTarget = undefined;
+                            // Listening = false;
+                            await subscriber.unsubscribe(`${GroupID}:channel`);
+                            await subscriber.quit();
+                            break;
+                        }
+
+                        const msgObj = {
+                            sender: state.userId,
+                            timestamp: Date.now(),
+                            content: Message,
+                        };
+
+                        const msgStr = JSON.stringify(msgObj);
+
+                        // 始终存入历史记录
+                        // await RedisHandle.RedisMessageList(`${GroupID}:GroAll`, msgStr);
+                        // let GroupMember = await RedisHandle.RedisGetMember(GroupID);
+                        await RedisHandle.RedisPublish(`${GroupID}:channel`, msgStr);
+                        await RedisHandle.RedisMessageList(`${GroupID}:GroAll`, msgStr);
+
+                        // for (let Member of GroupMember) {
+                        //     if (Member === UserID) {
+                        //         continue;
+                        //     }
+                        //     const TargetRaw = await RedisHandle.RedisStringGet(`Client${Member}`);
+                        //     if (TargetRaw) {
+                        //         const TargetState: SerWorkMune.ClientState = JSON.parse(TargetRaw);
+                        //         const isInChat = TargetState.mode && TargetState.chatTarget === GroupID;
+                        //         if (isInChat) {
+                        //             // 实时推送
+                        //             console.log('>>> 在线并在聊天界面，推送消息');
+                        //         }
+                        //     }
                         // 这里需要实现两个List来支持消息读取
                         // 接收消息部分的话，则在进入聊天界面时读取全部的inbox以及后二十条
+                        // }
                     }
-
                 }
             }
         }
     }
-
-
 }
+
 
 async function Register(socket: Socket) {
     let username = await getInput(socket, '请输入用户名: ');

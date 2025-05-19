@@ -12,8 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginMune = LoginMune;
 exports.FriendManageMune = FriendManageMune;
 exports.GroupManageMnue = GroupManageMnue;
-exports.getTargetSocket = getTargetSocket;
-// import net from "net";
 function LoginMune(socket) {
     return __awaiter(this, void 0, void 0, function* () {
         socket.write(`请选择操作
@@ -47,13 +45,27 @@ function GroupManageMnue(socket) {
     `);
     });
 }
-function getTargetSocket(Clients, UserID, TargetID) {
-    for (const [socket, state] of Clients.entries()) {
-        console.log(`${state.userId}, ${state.mode}, ${state.chatTarget}`);
-        if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
-            console.log(`进来了`);
-            return socket;
-        }
-    }
-    return null;
-}
+// export function getTargetSocket(Clients: Map<Socket, ClientState>, UserID: string, TargetID: string) {
+//     for (const [socket, state] of Clients.entries()) {
+//         if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
+//             console.log(`进来了`);
+//             return socket;
+//         }
+//     }
+//     return null;
+// }
+// export async function startMessageListener(socket: Socket, userId: string, targetId: string) {
+//     const channelKey = `${targetId}:${userId}Online`;
+//     while (true) {
+//         try {
+//             const result = await RedisHandle.RedisMessageBlPop(channelKey);
+//             if (result) {
+//                 const msg = JSON.parse(result.element);
+//                 socket.write(chalk.green(`${msg.sender}: ${msg.content}\n> `));
+//             }
+//         } catch (err) {
+//             console.error('BLPOP 错误:', err);
+//             break; // 或者 retry
+//         }
+//     }
+// }

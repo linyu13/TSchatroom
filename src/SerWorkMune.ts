@@ -1,6 +1,6 @@
 import {Socket} from 'net';
-
-// import net from "net";
+import * as RedisHandle from './redisType'
+import chalk from 'chalk';
 
 export async function LoginMune(socket: Socket) {
     socket.write(`请选择操作
@@ -8,8 +8,7 @@ export async function LoginMune(socket: Socket) {
     2. 群组管理
     3. 好友聊天
     4. 群组聊天
-    5. 文件传输
-    6. 退出
+    5. 退出
     `);
 
 }
@@ -38,15 +37,31 @@ export interface ClientState {
     userId: string;
     mode: boolean;
     chatTarget?: string;
+    SocketId: string;
 }
 
-export function getTargetSocket(Clients: Map<Socket, ClientState>, UserID: string, TargetID: string) {
-    for (const [socket, state] of Clients.entries()) {
-        if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
-            console.log(`进来了`);
-            return socket;
-        }
-    }
-    return null;
-}
+// export function getTargetSocket(Clients: Map<Socket, ClientState>, UserID: string, TargetID: string) {
+//     for (const [socket, state] of Clients.entries()) {
+//         if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
+//             console.log(`进来了`);
+//             return socket;
+//         }
+//     }
+//     return null;
+// }
 
+// export async function startMessageListener(socket: Socket, userId: string, targetId: string) {
+//     const channelKey = `${targetId}:${userId}Online`;
+//     while (true) {
+//         try {
+//             const result = await RedisHandle.RedisMessageBlPop(channelKey);
+//             if (result) {
+//                 const msg = JSON.parse(result.element);
+//                 socket.write(chalk.green(`${msg.sender}: ${msg.content}\n> `));
+//             }
+//         } catch (err) {
+//             console.error('BLPOP 错误:', err);
+//             break; // 或者 retry
+//         }
+//     }
+// }
