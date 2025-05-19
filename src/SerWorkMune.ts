@@ -1,6 +1,6 @@
 import {Socket} from 'net';
-import * as RedisHandle from './redisType'
-import chalk from 'chalk';
+// import * as RedisHandle from './redisType'
+// import chalk from 'chalk';
 
 export async function LoginMune(socket: Socket) {
     socket.write(`请选择操作
