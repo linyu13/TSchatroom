@@ -76,3 +76,29 @@ export async function RedisMessageHasUnread(UserID: string, FriendID: string) {
 export async function RedisMessageDel(Key: string) {
     await redisClient.del(Key);
 }
+
+export async function RedisStringGet(Key: string) {
+    return await redisClient.get(Key);
+}
+
+export async function RedisMessageBlPop(key: string) {
+    return await redisClient.blPop(key, 0);
+}
+
+// 订阅频道
+export async function RedisSubscribe(channel: string, messageHandler: (msg: string) => void) {
+    const subscriber = redisClient.duplicate();
+    await subscriber.connect();
+
+    await subscriber.subscribe(channel, (message) => {
+        messageHandler(message);
+    });
+
+    return subscriber;  // 如果后续要取消订阅可以用它
+}
+
+// 发布消息
+export async function RedisPublish(channel: string, message: string) {
+    await redisClient.publish(channel, message);
+}
+
