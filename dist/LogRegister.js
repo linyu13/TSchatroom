@@ -88,7 +88,7 @@ function Menu(socket) {
             }
         }
         const UserID = username;
-        const Clients = new Map;
+        const Clients = new Map();
         yield RedisHandle.RedisSet('online', UserID);
         while (true) {
             const state = {
@@ -299,14 +299,11 @@ function Menu(socket) {
                             };
                             if (yield RedisHandle.RedisIsMember('online', TargetID)) {
                                 let isPushed = false;
-                                for (const [otherSocket, otherState] of Clients.entries()) {
-                                    if (otherState.userId === TargetID && otherState.mode === true && otherState.chatTarget === UserID) {
-                                        // 对方正在与你私聊，实时推送
-                                        otherSocket.write(chalk_1.default.green(`\n[${msgObj.sender}] ${new Date(msgObj.timestamp).toLocaleTimeString()}\n${msgObj.content}\n`));
-                                        yield RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
-                                        isPushed = true;
-                                        break;
-                                    }
+                                const target = SerWorkMune.getTargetSocket(Clients, UserID, TargetID);
+                                if (target) {
+                                    target.write(chalk_1.default.green(`\n[${msgObj.sender}]\n${msgObj.content}\n`));
+                                    yield RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
+                                    isPushed = true;
                                 }
                                 if (!isPushed) {
                                     // 对方在线但不在聊天界面

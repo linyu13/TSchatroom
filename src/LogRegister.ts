@@ -1,4 +1,4 @@
-import * as net from 'net';
+// import * as net from 'net';
 import {Socket} from 'net';
 import * as SerWorkMune from './SerWorkMune'
 import * as RedisHandle from './redisType'
@@ -40,7 +40,7 @@ export async function Menu(socket: Socket) {
         }
     }
     const UserID = username as string;
-    const Clients = new Map<net.Socket, SerWorkMune.ClientState>
+    const Clients: Map<Socket, SerWorkMune.ClientState> = new Map();
     await RedisHandle.RedisSet('online', UserID);
     while (true) {
         const state: SerWorkMune.ClientState = {
@@ -241,15 +241,11 @@ export async function Menu(socket: Socket) {
 
                         if (await RedisHandle.RedisIsMember('online', TargetID)) {
                             let isPushed = false;
-
-                            for (const [otherSocket, otherState] of Clients.entries()) {
-                                if (otherState.userId === TargetID && otherState.mode === true && otherState.chatTarget === UserID) {
-                                    // 对方正在与你私聊，实时推送
-                                    otherSocket.write(chalk.green(`\n[${msgObj.sender}] ${new Date(msgObj.timestamp).toLocaleTimeString()}\n${msgObj.content}\n`));
-                                    await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
-                                    isPushed = true;
-                                    break;
-                                }
+                            const target = SerWorkMune.getTargetSocket(Clients, UserID, TargetID);
+                            if (target) {
+                                target.write(chalk.green(`\n[${msgObj.sender}]\n${msgObj.content}\n`));
+                                await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, JSON.stringify(msgObj));
+                                isPushed = true;
                             }
                             if (!isPushed) {
                                 // 对方在线但不在聊天界面

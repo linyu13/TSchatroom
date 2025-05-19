@@ -12,6 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginMune = LoginMune;
 exports.FriendManageMune = FriendManageMune;
 exports.GroupManageMnue = GroupManageMnue;
+exports.getTargetSocket = getTargetSocket;
+// import net from "net";
 function LoginMune(socket) {
     return __awaiter(this, void 0, void 0, function* () {
         socket.write(`请选择操作
@@ -44,4 +46,14 @@ function GroupManageMnue(socket) {
     5. 退出
     `);
     });
+}
+function getTargetSocket(Clients, UserID, TargetID) {
+    for (const [socket, state] of Clients.entries()) {
+        console.log(`${state.userId}, ${state.mode}, ${state.chatTarget}`);
+        if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
+            console.log(`进来了`);
+            return socket;
+        }
+    }
+    return null;
 }

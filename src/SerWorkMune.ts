@@ -1,5 +1,7 @@
 import {Socket} from 'net';
 
+// import net from "net";
+
 export async function LoginMune(socket: Socket) {
     socket.write(`请选择操作
     1. 好友管理
@@ -37,3 +39,14 @@ export interface ClientState {
     mode: boolean;
     chatTarget?: string;
 }
+
+export function getTargetSocket(Clients: Map<Socket, ClientState>, UserID: string, TargetID: string) {
+    for (const [socket, state] of Clients.entries()) {
+        if (state.userId === TargetID && state.mode && state.chatTarget === UserID) {
+            console.log(`进来了`);
+            return socket;
+        }
+    }
+    return null;
+}
+
