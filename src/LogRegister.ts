@@ -256,8 +256,7 @@ export async function Menu(socket: Socket) {
                         if (await RedisHandle.RedisIsMember('online', TargetID)) {
                             const isOnline = await RedisHandle.RedisIsMember('online', TargetID);
                             const msgStr = JSON.stringify(msgObj);
-
-// 始终存入历史记录
+                            // 始终存入历史记录
                             await RedisHandle.RedisMessageList(`${UserID}:${TargetID}PriAll`, msgStr);
 
                             if (isOnline) {
